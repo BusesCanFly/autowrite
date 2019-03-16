@@ -31,38 +31,54 @@ if args.verbose:
 else:
         verbose=' '
 
-def find_and_flash():
-	os.system("lsblk -i | grep disk | cut -d\  -f1 | grep -iE \"sd|mmcblk|hdd\""+ignore+" > ./devices.txt")
+cprint("Locating storage devices to write to...", "green")
+os.system("lsblk -i | grep disk | cut -d\  -f1 | grep -iE \"sd|mmcblk|hdd\""+ignore+" > ./devices.txt")
 
-	list = './devices.txt'
-	with open(list) as inf:
-	                devices = [line.strip() for line in inf]
+list = './devices.txt'
+with open(list) as inf:
+                devices = [line.strip() for line in inf]
+os.system("rm ./devices.txt")
 
-	os.system("rm ./devices.txt")
+cprint("NOTE: use --sda to disable writing to /dev/sda if that is your host disk", "red")
+
+if args.verbose or args.safe:
+	c=0
+	cprint("Located devices:", "yellow")
+	while c < len(devices):
+		print("/dev/"+devices[c])
+		c+=1
+	print(raw_input(colored("\nPress any key to proceed to imaging ", "green")))
+
+if not args.safe:
 	i=0
 	while i < len(devices):
-		if not args.safe:
-                        cprint("Starting write to /dev/"+devices[i], "yellow")
-                        os.system("sudo dd bs=4M if="+args.image+" of=/dev/"+devices[i]+verbose+"conv=fsync")
-                        cprint("Write complete", "yellow")
-			sleep(1)
-                        if args.validate:
-                                count=raw_input("Enter the count from the initial dd to validate: ")
-                                os.system("sudo dd bs=4M if=/dev/"+devices[i]+verbose+" of=./images/SDCARD.img count="+count)
-                                cprint("Comparing disk image to original... ", "yellow")
-                                os.system("diff -s ./images/SDCARD.img "+args.image)
-				sleep(1)
-
-	        else:
-			cprint("Starting write to /dev/"+devices[i], "yellow")
-			print("sudo dd bs=4M if="+args.image+" of=/dev/"+devices[i]+verbose+"conv=fsync")
-			cprint("Write complete", "yellow")
-			sleep(1)
-			if args.validate:
-				count=raw_input("Enter the count from the initial dd to validate: ")
-				print("sudo dd bs=4M if=/dev/"+devices[i]+verbose+" of=./images/SDCARD.img count="+count)
-				cprint("Comparing disk image to original... ", "yellow")
-				print("diff -s ./images/SDCARD.img "+args.image)
-				sleep(1)
+		start_msg = colored("Starting write to ", "green")+colored("/dev/"+devices[i], "yellow")
+	        print(start_msg)
+	        os.system("sudo dd bs=4M if="+args.image+" of=/dev/"+devices[i]+verbose+"conv=fsync")
+	        cprint("Write complete", "green")
+	        sleep(1)
+	        if args.validate:
+		        count=raw_input(colored("\nEnter the number before \"+0 records out\" to validate: ", "yellow"))
+		        os.system("sudo dd bs=4M if=/dev/"+devices[i]+verbose+" of=./images/SDCARD.img count="+count)
+		        cprint("Comparing disk image to original... ", "green")
+		        os.system("diff -s ./images/SDCARD.img "+args.image)
+		        sleep(1)
+		        os.system("rm ./images/SDCARD.img")
 		i+=1
-find_and_flash()
+else:
+	i=0
+	while i < len(devices):
+		start_msg = colored("\nStarting write to ", "green")+colored("/dev/"+devices[i], "yellow")
+	        print(start_msg)
+	        print("sudo dd bs=4M if="+args.image+" of=/dev/"+devices[i]+verbose+"conv=fsync")
+	        cprint("Write complete", "green")
+	        sleep(1)
+	        if args.validate:
+		        count=raw_input(colored("\nEnter the number before \"+0 records out\" to validate: ", "yellow"))
+		        print("sudo dd bs=4M if=/dev/"+devices[i]+verbose+" of=./images/SDCARD.img count="+count)
+		        cprint("Comparing disk image to original... ", "green")
+		        print("diff -s ./images/SDCARD.img "+args.image)
+		        sleep(1)
+		        print("rm ./images/SDCARD.img")
+		i+=1
+
