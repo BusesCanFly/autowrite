@@ -10,7 +10,7 @@ parser.add_argument('-f', '--image', type=str,
                     help='Path to image to use')
 parser.add_argument('-v', dest='verbose', action='store_true',
                     help='Enable dd\'s status=progress')
-parser.add_argument('--rpi', action='store_true',
+parser.add_argument('--no-sda', action='store_true', dest='rpi',
                     help='Ignore /dev/sda')
 parser.add_argument('--validate', action='store_true',
                     help='Image the drive and compare it to the original image')
@@ -39,7 +39,7 @@ with open(list) as inf:
                 devices = [line.strip() for line in inf]
 os.system("rm ./devices.txt")
 
-cprint("NOTE: use --sda to disable writing to /dev/sda if that is your host disk", "red")
+cprint("NOTE: use --no-sda to disable writing to /dev/sda if that is your host disk", "red")
 
 if args.verbose or args.safe:
 	c=0
