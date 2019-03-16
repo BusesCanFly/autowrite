@@ -21,19 +21,19 @@ Place desired image into `autowrite/images/`
 
 ## Usage
 ```
-usage: autowrite.py [-h] [-f IMAGE] [-v] [--rpi] [--validate] [--safe]
+usage: autowrite.py [-h] [-f IMAGE] [-v] [--no-sda] [--validate] [--safe]
 
 optional arguments:
   -h, --help            show this help message and exit
   -f IMAGE, --image IMAGE
                         Path to image to use
   -v                    Enable dd's status=progress
-  --rpi                 Ignore /dev/sda
+  --no-sda                 Ignore /dev/sda
   --validate            Image the drive and compare it to the original image
   --safe                Print, not dd
 ```
 * Example: `./autowrite.py -v -f ./images/raspbian.img --validate`
-* If running autowrite on a raspberry pi, use the `--rpi` flag to prevent overwriting /dev/sda, the pi's internal SD card
+* If running autowrite on a raspberry pi, use the `--no-sda` flag to prevent overwriting /dev/sda, the pi's internal SD card
 
 ## Disclaimer
 _Be careful not to overwrite your host's main drive_
