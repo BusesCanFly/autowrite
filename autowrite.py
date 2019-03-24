@@ -14,6 +14,8 @@ parser.add_argument('--no-sda', action='store_true', dest='rpi',
                     help='Ignore /dev/sda')
 parser.add_argument('--validate', action='store_true',
                     help='Image the drive and compare it to the original image')
+parser.add_argument('-e', '--eject', action='store_true',
+		    help='Unmount drive after finishing flashing/validation')
 parser.add_argument('--safe', action='store_true',
                     help='Print, not dd')
 args = parser.parse_args()
@@ -64,6 +66,8 @@ if not args.safe:
 		        os.system("diff -s ./images/SDCARD.img "+args.image)
 		        sleep(1)
 		        os.system("rm ./images/SDCARD.img")
+		if args.eject:
+                        os.system('sudo umount /dev/'+devices[i]+'*')
 		i+=1
 else:
 	i=0
@@ -80,5 +84,6 @@ else:
 		        print("diff -s ./images/SDCARD.img "+args.image)
 		        sleep(1)
 		        print("rm ./images/SDCARD.img")
+		if args.eject:
+			print('sudo umount /dev/'+devices[i]+'*')
 		i+=1
-
