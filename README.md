@@ -3,6 +3,8 @@ Automate dd'ing and verifying SD cards
 
 This tool is useful for when you need to flash many SD cards/drives with a certain .iso/.img/etc. Autowrite automatically detects all plugged in disks and starts flashing them with the specified image.
 
+![alt text](https://github.com/BusesCanFly/autowrite/blob/master/screenshot.png "Who doesn't love ASCII art?")
+
 # GUIDE:
 
 ## Installation
