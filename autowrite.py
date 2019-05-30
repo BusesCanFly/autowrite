@@ -49,7 +49,7 @@ cprint("\nLocated devices:", "yellow")
 while c < len(devices):
 	print("/dev/"+devices[c])
 	c+=1
-print(raw_input(colored("\nPress any key to proceed to imaging ", "green")))
+print(raw_input(colored("\nPress [ENTER] to proceed to imaging ", "green")))
 
 i=0
 while i < len(devices):
@@ -68,7 +68,7 @@ while i < len(devices):
 	        os.system("rm ./images/VALIDATE.img")
 
         if args.rpi:
-                print(raw_input(colored("\nUnplug and replug the device, then hit any key ", "green")))
+                print(raw_input(colored("\nUnplug and replug the device, then hit [ENTER] ", "green")))
                 cprint("Setting up ssh and wpa_supplicant.conf", "green")
                 sleep(1)
 		cprint("Creating mount space", "green")
