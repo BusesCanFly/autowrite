@@ -84,6 +84,6 @@ while i < len(devices):
 		cprint("Cleaning up...", "green")
 		os.system('rmdir MOUNT')
 		cprint("Headless setup is ready", "green")
-		i+=1
+	i+=1
 
 print colored("\n\nDone :)\n\n", "magenta")
