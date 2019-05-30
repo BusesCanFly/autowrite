@@ -71,6 +71,8 @@ while i < len(devices):
                 print(raw_input(colored("\nUnplug and replug the device, then hit any key ", "green")))
                 cprint("Setting up ssh and wpa_supplicant.conf", "green")
                 sleep(1)
+		cprint("Creating mount space", "green")
+		os.system("mkdir ./MOUNT")
 		cprint("Mounting boot partition (1)", "green")
 		os.system("sudo mount /dev/"+devices[i]+"p1 ./MOUNT/ 2>/dev/null")
 		os.system("sudo mount /dev/"+devices[i]+"1 ./MOUNT/ 2>/dev/null")
@@ -79,6 +81,9 @@ while i < len(devices):
 		cprint("Copying ./images/wpa_suplicant.conf to boot partition", "green")
                 os.system('cp ./images/wpa_supplicant.conf ./MOUNT/')
 		os.system('sudo umount ./MOUNT/')
+		cprint("Cleaning up...", "green")
+		os.system('rmdir MOUNT')
+		cprint("Headless setup is ready", "green")
 		i+=1
 
 print colored("\n\nDone :)\n\n", "magenta")
