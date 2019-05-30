@@ -19,20 +19,26 @@ Place desired image into `autowrite/images/`
     * [Kali](https://www.kali.org/downloads/)
     * [Ubuntu](https://www.ubuntu.com/download)
 
+## Raspberry pi headless setup
+* [It is possible](https://www.raspberrypi.org/forums/viewtopic.php?t=191252) to have your raspberry pi connect to a wifi network and open up ssh when it boots, so no screen, keyboard, or mouse is required for setup (this is known as "headless" operation)
+* with `--rpi`, autowrite will automatically create the necessary config files for headless operation of a raspberry pi
+	* Just edit `./images/wpa_supplicant.conf` and change the SSID and password to whatever you want to use
+
 ## Usage
 ```
-usage: autowrite.py [-h] [-f IMAGE] [-v] [--no-sda] [--validate] [--safe]
+usage: autowrite.py [-h] [-f IMAGE] [--no-sda] [--validate] [--rpi]
 
 optional arguments:
   -h, --help            show this help message and exit
   -f IMAGE, --image IMAGE
                         Path to image to use
-  -v                    Enable dd's status=progress
-  --no-sda                 Ignore /dev/sda
+  --no-sda              Ignore /dev/sda
   --validate            Image the drive and compare it to the original image
-  --safe                Print, not dd
+  --rpi                 Enable ssh and wpa_supplicant on boot
+                        (wpa_supplicant.conf from ~/images)
 ```
-* Example: `./autowrite.py -v -f ./images/raspbian.img --validate`
+* Example: `./autowrite.py --no-sda -f ./images/raspbian.img --validate --rpi`
+	* This will flash raspbian.img to every device that isn't /dev/sda, validate that the flashed disk is not corrupted, and then setup the config files for headless operation
 * If running autowrite on a raspberry pi, use the `--no-sda` flag to prevent overwriting /dev/sda, the pi's internal SD card
 
 ## Disclaimer
