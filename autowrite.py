@@ -8,7 +8,7 @@ from termcolor import colored, cprint
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--image', type=str,
                     help='Path to image to use')
-parser.add_argument('--no-sda', action='store_true', dest='rpi',
+parser.add_argument('--no-sda', action='store_true', dest='sda',
                     help='Ignore /dev/sda')
 parser.add_argument('--validate', action='store_true',
                     help='Image the drive and compare it to the original image')
@@ -17,7 +17,7 @@ parser.add_argument('--rpi', action='store_true',
 args = parser.parse_args()
 
 global ignore
-if args.rpi:
+if args.sda:
         ignore=' | grep -v sda '
 else:
 	ignore=' '
