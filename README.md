@@ -12,10 +12,8 @@ Autowrite currently has features for:
 # Guide:
 
 ## Installing:
-  1. Install `argparse`
-    * `sudo pip3 install --user argparse` or whatever you want (venv)
-  2. Install autowrite
-    * `git clone https://github.com/BusesCanFly/autowrite && cd ./autowrite; chmod +x autowrite.py`
+  1. Install `argparse`: `sudo pip3 install --user argparse` or whatever you want (venv)
+  2. Install autowrite: `git clone https://github.com/BusesCanFly/autowrite && cd ./autowrite; chmod +x autowrite.py`
 
 ## Usage:
 ```
