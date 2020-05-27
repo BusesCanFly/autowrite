@@ -1,89 +1,256 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
+#!/usr/bin/python3
+
+# Rewrite of github.com/BusesCanFly/autowrite in better python
+# (more comfort features than would be easy to make in bash)
+
 import os
 import argparse
-from time import sleep
-from termcolor import colored, cprint
+import subprocess
+# while `import blkinfo` exists, I'd rather parse lsblk myself
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-f', '--image', type=str,
-                    help='Path to image to use')
-parser.add_argument('--no-sda', action='store_true', dest='sda',
-                    help='Ignore /dev/sda')
-parser.add_argument('--validate', action='store_true',
-                    help='Image the drive and compare it to the original image')
-parser.add_argument('--rpi', action='store_true',
-		    help='Enable ssh and wpa_supplicant on boot (wpa_supplicant.conf from ~/images)')
-args = parser.parse_args()
+indent = ' '*2
+hashType = "sha256sum" # bash command used in validating flash
+mountpoint = f"/media/{os.getlogin()}"
+#mountpoint = f"/run/media/{os.getlogin()}" # uncomment for fedora where devices are in /run/media/, not /media/
 
-global ignore
-if args.sda:
-        ignore=' | grep -v sda '
-else:
-	ignore=' '
+exclude = [
+	"nvme0n1"
+	,"sda" 	# comment this line out to allow flashing /dev/sda (if that is not your host disk)
+]
 
-main_color="yellow"
-sub_color="green"
-cprint("  ___  _   _ _____ _____  _    _______ _____ _____ _____ ", main_color)
-cprint(" / _ \| | | |_   _|  _  || |  | | ___ \_   _|_   _|  ___|", main_color)
-cprint("/ /_\ \ | | | | | | | | || |  | | |_/ / | |   | | | |__  ", main_color)
-cprint("|  _  | | | | | | | | | || |/\| |    /  | |   | | |  __| ", main_color)
-cprint("| | | | |_| | | | \ \_/ /\  /\  / |\ \ _| |_  | | | |___ ", main_color)
-cprint("\_| |_/\___/  \_/  \___/  \/  \/\_| \_|\___/  \_/ \____/ ", main_color)
-cprint("---------------------------------------------------------", main_color)
-cprint("      BusesCanFly                        76 32 2e 30     ", sub_color)
-cprint("---------------------------------------------------------", main_color)
+def args():
+	parser = argparse.ArgumentParser()
+	parser.add_argument("-f", "--image", type=str, help="Path to image to use")
+	parser.add_argument("-d", "--device", type=str, help="Device to flash (ex/ \"mmcblk0\")")
+	parser.add_argument("-v", "--validate", action="store_true", help="Validate flashed device hash")
+	parser.add_argument("--hash", type=str, help="Expected hash of image file (iso, img, etc.)")
+	parser.add_argument("-s", "--ssh", action="store_true", help="Setup headless raspi ssh")
+	parser.add_argument("-u", "--serial", action="store_true", help="Setup headless raspi uart")
+	parser.add_argument("-w", "--wpa", type=str, help="Path to wpa_supplicant.conf for headless raspi setup")
+	parser.add_argument("--rpi", action="store_true", help="Same as -s -u -w")
+	parser.add_argument("-y", "--yes", action="store_true", help="Skip all prompts")
+	return parser.parse_args()
 
-cprint("\n\nLocating storage devices to write to...", "green")
-os.system("lsblk -i | grep disk | cut -d\  -f1 | grep -iE \"sd|mmcblk|hdd\""+ignore+" > ./devices.txt")
+def diskInfo():
+	lsblk = subprocess.getoutput("lsblk -r -o NAME,LABEL,TYPE").split("\n")
 
-list = './devices.txt'
-with open(list) as inf:
-                devices = [line.strip() for line in inf]
-os.system("rm ./devices.txt")
+	devices = []
+	partitions = []
 
-cprint("NOTE: use --no-sda to prevent overwriting /dev/sda if that is your host disk!", "red")
+	for line in lsblk:
+		line = line.strip("`")
+		line = line.split()
+		if "loop" not in line[0]:
+			if len(line) == 2: # Disk, or part with no label
+				if "disk" in line[1]:
+					devices.append(line[0]) # device name
+				if "part" in line[1]:
+					partitions.append(line[0]) # partition /dev/ name
+			if len(line) == 3: # Disk or part with label
+				if "disk" in line[2]:
+					devices.append(line[0])
+				if "part" in line[2]:
+					partitions.append([line[0], line[1]]) # [label, /dev/ name]
 
-c=0
-cprint("\nLocated devices:", "yellow")
-while c < len(devices):
-	print("/dev/"+devices[c])
-	c+=1
-print(raw_input(colored("\nPress [ENTER] to proceed to imaging ", "green")))
+	deviceInfo = []
+	deviceInfo.append(devices)
+	deviceInfo.append(partitions)
+	return deviceInfo # [devices, partitions]
 
-i=0
-while i < len(devices):
-	start_msg = colored("Starting write to ", "green")+colored("/dev/"+devices[i], "yellow")
-        print(start_msg)
-        os.system("sudo dd bs=4M if="+args.image+" of=/dev/"+devices[i]+" status=progress conv=fsync")
-        cprint("Write complete", "green")
-        sleep(1)
+def getPartitions(device):
+	partitions = []
+	devInfo = subprocess.getoutput(f"lsblk -r -o NAME,LABEL,TYPE /dev/{device}").split("\n")
+	for line in devInfo:
+		line = line.split()
+		if len(line) == 3: # Don't need to get device info
+			if "part" in line[2]:
+				partitions.append([line[0], line[1]]) # [label, /dev/ name]
+	return partitions
 
-        if args.validate:
-	        count=raw_input(colored("\nEnter the number before \"+0 records out\" to validate: ", "yellow"))
-	        os.system("sudo dd bs=4M if=/dev/"+devices[i]+" of=./images/VALIDATE.img status=progress count="+count)
-	        cprint("Comparing disk image to original... ", "green")
-	        os.system("diff -s ./images/VALIDATE.img "+args.image)
-	        sleep(1)
-	        os.system("rm ./images/VALIDATE.img")
+def menu(devices, partitions):
+	print("[*] Found devices:")
+	for device in devices:
+		print(f"{indent}[{devices.index(device) + 1}]: {device}")
+		for partition in partitions:
+			if len(partition) == 2: # partition has label
+				if device in partition[0]:
+					print(f"{indent*2} ╚═> {partition[1]}")
+			else:
+				if device in partition:
+					print(f"{indent*2} ╚═> {partition}")
 
-        if args.rpi:
-                print(raw_input(colored("\nUnplug and replug the device, then hit [ENTER] ", "green")))
-                cprint("Setting up ssh and wpa_supplicant.conf", "green")
-                sleep(1)
-		cprint("Creating mount space", "green")
-		os.system("mkdir ./MOUNT")
-		cprint("Mounting boot partition (1)", "green")
-		os.system("sudo mount /dev/"+devices[i]+"p1 ./MOUNT/ 2>/dev/null")
-		os.system("sudo mount /dev/"+devices[i]+"1 ./MOUNT/ 2>/dev/null")
-		cprint("Creating 'ssh' file", "green")
-                os.system('touch ./MOUNT/ssh')
-		cprint("Copying ./images/wpa_suplicant.conf to boot partition", "green")
-                os.system('cp ./images/wpa_supplicant.conf ./MOUNT/')
-		os.system('sudo umount ./MOUNT/')
-		cprint("Cleaning up...", "green")
-		os.system('rmdir MOUNT')
-		cprint("Headless setup is ready", "green")
-	i+=1
+	toFlash = []
+	devs = input("\n[~] Enter device number to flash, comma separated (or \"*\" for all devices): ")
+	if devs == "*":
+		for device in devices:
+			if device not in exclude:
+				toFlash.append(device)
+			else:
+				print(f"[!] {device} is in the exclude list, skipping flash.")
+	else:
+		for dev in devs.split(","):
+			device = devices[int(dev) - 1]
+			input(f"[!] You are about to reflash device /dev/{device}, press [ENTER] to confirm ")
+			if device not in exclude:
+				toFlash.append(device)
+			else:
+				print(f"[!] {device} is in the exclude list, skipping flash.")
+				print("[^] Check the top of the script to find excluded device names.")
+	return toFlash
 
-print colored("\n\nDone :)\n\n", "magenta")
+def imagePrompt():
+	return input("\n[~] Enter path to image file: ")
+
+def flash(device, image):
+	print(f"\n[*] Starting flash of {device}")
+	subprocess.call(f"sudo dd bs=4M if={image} of=/dev/{device} status=progress conv=fsync", shell=True)
+
+def hashCheck():
+	status = ""
+	while status == "":
+		continue_answer = input("[?] Continue? [y/n]: ")
+		if continue_answer == "y" or continue_answer == "Y":
+			status = "continue"
+		elif continue_answer == "n" or continue_answer == "N":
+			status = "exit"
+		else:
+			print("[-] Answer with \"y\" or \"n\"")	
+	if status == "exit":
+		print("[!] Exiting!")
+		os._exit(1)	
+
+def imgHashCheck(image, isoHash):
+	status = False
+	fileHash = subprocess.getoutput(f"{hashType} {image}").split()[0]
+	if fileHash == isoHash:
+		status = True
+	return status
+
+def imgHashContinue():
+	status = ""
+	while status == "":
+		continue_answer = input(f"[?] Continue? [y/n]: ")
+		if continue_answer == "y" or continue_answer == "Y":
+			status = "continue"
+		elif continue_answer == "n" or continue_answer == "N":
+			status = "exit"
+		else:
+			print("[-] Answer with \"y\" or \"n\"")	
+
+	if status == "continue":
+		return True
+	elif status == "exit":
+		print("[!] Exiting!")
+		os._exit(3)
+
+def validate(device, image):
+	print(f"\n[*] Validating flash of {device}")
+	deviceHash = subprocess.getoutput(f"sudo head -c $(stat -c '%s' {image}) /dev/{device} | {hashType}").split()[0]
+	fileHash = subprocess.getoutput(f"{hashType} {image}").split()[0]
+	if deviceHash == fileHash:
+		print("[+] Hashes match- flash successful!")
+	else:
+		print("[-] Hash mismatch- flash failed.")
+		if not args.yes:
+			hashCheck()	
+
+def rpiSetup(device):
+	foundBoot = False
+	mount = f"{mountpoint}/boot"
+	diskparts = getPartitions(device)
+	for partition in diskparts:
+		if partition[1] == "boot":
+			foundBoot = True
+			mountBoot(partition, mount)
+			if args.ssh or args.rpi:
+				if not os.path.isfile(f"{mount}/ssh"):
+					os.mknod(f"{mount}/ssh")
+					print("[+] Created ssh file")
+				else:
+					print("[*] ssh file already present")
+			if args.serial or args.rpi:
+				with open(f"{mount}/config.txt", "a") as config:
+					config.write("enable_uart=1\n")
+				print("[+] Edited config.txt to enable UART")
+			if args.wpa or args.rpi:
+				subprocess.call(f"cp {args.wpa} {mount}/wpa_supplicant.conf", shell=True)
+				print(f"[+] Copied {args.wpa} to boot partition")
+		umount(f"/dev/{partition[0]}") # True means delete the mountpoint dir	
+
+	os.rmdir(mount)
+	if not foundBoot:
+		print(f"[-] {device} partition \"boot\" not found. Exiting!")
+		os._exit(2)
+
+
+def mountBoot(partition, mount):
+	if not os.path.isdir(mount):
+		print("[*] Making mount folder.")
+		os.mkdir(mount)
+	elif not os.path.ismount(mount):
+		subprocess.call(f"mount /dev/{partition[0]} {mount}", shell=True)
+		print(f"[+] Mounted /dev/{partition[0]} to {mount}")
+		return
+	else:
+		print(f"[-] Mountpoint {mount} already exists")
+		if not args.yes:
+			checkUmount(partition, mount) # mountpoint already exists	
+		else:
+			umount(mount)
+
+def checkUmount(partition, mount):
+	status = ""
+	while status == "":
+		umount_answer = input(f"[?] Unmount {mount}? [y/n]: ")
+		if umount_answer == "y" or umount_answer == "Y":
+			status = "umount"
+		elif umount_answer == "n" or umount_answer == "N":
+			status = "exit"
+		else:
+			print("[-] Answer with \"y\" or \"n\"")	
+
+	if status == "umount":
+		umount(mount)
+		print(f"[+] Unmounted {mount}")
+		mountBoot(partition, mount)
+	elif status == "exit":
+		print("[!] Exiting!")
+		os._exit(3)
+
+def umount(mount):
+	subprocess.call(f"umount -f {mount}", shell=True)
+
+if __name__ == '__main__':
+
+	args = args()
+
+	if not args.device:
+		deviceInfo = diskInfo()
+		devices = deviceInfo[0]
+		partitions = deviceInfo[1]
+		toFlash = menu(devices, partitions)
+	else:
+		if args.device == "all" or args.device == "*":
+			deviceInfo = diskInfo()
+			toFlash = deviceInfo[0]
+		else:
+			toFlash = [args.device]
+
+	if not args.image:
+		image = imagePrompt()
+	else:
+		image = args.image
+
+	if args.hash:
+		if imgHashCheck(image, args.hash):
+			print(f"\n[+] Image file hash matches expected hash")
+		else:
+			print(f"\n[-] Image file mismatch with expected hash")
+			imgHashContinue()
+
+	for device in toFlash:
+		flash(device, image)
+		if args.validate:
+			validate(device, image)
+		if args.ssh or args.wpa:
+			rpiSetup(device)
